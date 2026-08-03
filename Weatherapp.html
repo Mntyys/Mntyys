@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weather</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1e2a38;
+    font-family: Arial, sans-serif;
+  }
+  .card {
+    width: 340px;
+    padding: 24px;
+    text-align: center;
+  }
+  .search-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  input {
+    flex: 1;
+    padding: 10px 12px;
+    font-size: 15px;
+    border-radius: 6px;
+    border: none;
+  }
+  button {
+    padding: 10px 16px;
+    font-size: 14px;
+    border: none;
+    border-radius: 6px;
+    background: #4caf50;
+    color: white;
+    cursor: pointer;
+  }
+  button:hover { background: #45a049; }
+  #status { color: #9fb3c8; font-size: 13px; min-height: 18px; margin-bottom: 8px; }
+  #location { color: white; font-size: 18px; font-weight: bold; margin: 8px 0 0; }
+  #temp { color: white; font-size: 56px; font-weight: bold; margin: 4px 0; }
+  #condition { color: #d0dbe6; font-size: 15px; margin-bottom: 16px; }
+  .details {
+    background: #28374a;
+    border-radius: 8px;
+    padding: 4px 16px;
+  }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #33445a;
+    font-size: 14px;
+  }
+  .row:last-child { border-bottom: none; }
+  .row span:first-child { color: #9fb3c8; }
+  .row span:last-child { color: white; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="search-row">
+    <input type="text" id="city" value="London" placeholder="Enter a city">
+    <button onclick="search()">Search</button>
+  </div>
+  <div id="status"></div>
+  <div id="location"></div>
+  <div id="temp"></div>
+  <div id="condition"></div>
+  <div class="details">
+    <div class="row"><span>Feels like</span><span id="feels">--</span></div>
+    <div class="row"><span>Humidity</span><span id="humidity">--</span></div>
+    <div class="row"><span>Wind</span><span id="wind">--</span></div>
+    <div class="row"><span>Today's high / low</span><span id="highlow">--</span></div>
+  </div>
+</div>
+
+<script>
+const WEATHER_CODES = {
+  0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
+  45: "Fog", 48: "Depositing rime fog",
+  51: "Light drizzle", 53: "Moderate drizzle", 55: "Dense drizzle",
+  56: "Light freezing drizzle", 57: "Dense freezing drizzle",
+  61: "Slight rain", 63: "Moderate rain", 65: "Heavy rain",
+  66: "Light freezing rain", 67: "Heavy freezing rain",
+  71: "Slight snow fall", 73: "Moderate snow fall", 75: "Heavy snow fall",
+  77: "Snow grains",
+  80: "Slight rain showers", 81: "Moderate rain showers", 82: "Violent rain showers",
+  85: "Slight snow showers", 86: "Heavy snow showers",
+  95: "Thunderstorm", 96: "Thunderstorm with slight hail", 99: "Thunderstorm with heavy hail"
+};
+
+async function geocode(place) {
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(place)}&count=1`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  if (!data.results || data.results.length === 0) return null;
+  const top = data.results[0];
+  const parts = [top.name];
+  if (top.admin1) parts.push(top.admin1);
+  if (top.country) parts.push(top.country);
+  return { lat: top.latitude, lon: top.longitude, label: parts.join(", ") };
+}
+
+async function getWeather(lat, lon) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code` +
+    `&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto`;
+  const resp = await fetch(url);
+  return resp.json();
+}
+
+async function search() {
+  const place = document.getElementById('city').value.trim();
+  if (!place) return;
+
+  const status = document.getElementById('status');
+  status.textContent = "Searching...";
+
+  try {
+    const location = await geocode(place);
+    if (!location) {
+      status.textContent = "";
+      alert(`No location found for "${place}"`);
+      return;
+    }
+    const data = await getWeather(location.lat, location.lon);
+    updateUI(location, data);
+    status.textContent = "";
+  } catch (err) {
+    status.textContent = "";
+    alert("Something went wrong: " + err.message);
+  }
+}
+
+function updateUI(location, data) {
+  const current = data.current;
+  const daily = data.daily;
+  const condition = WEATHER_CODES[current.weather_code] || "Unknown";
+
+  document.getElementById('location').textContent = location.label;
+  document.getElementById('temp').textContent = Math.round(current.temperature_2m) + "°C";
+  document.getElementById('condition').textContent = condition;
+  document.getElementById('feels').textContent = Math.round(current.apparent_temperature) + "°C";
+  document.getElementById('humidity').textContent = current.relative_humidity_2m + "%";
+  document.getElementById('wind').textContent = Math.round(current.wind_speed_10m) + " km/h";
+
+  const high = Math.round(daily.temperature_2m_max[0]);
+  const low = Math.round(daily.temperature_2m_min[0]);
+  document.getElementById('highlow').textContent = `${high}° / ${low}°`;
+}
+
+document.getElementById('city').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') search();
+});
+
+search();
+</script>
+
+</body>
+</html>
