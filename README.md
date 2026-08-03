@@ -1,4 +1,4 @@
-Hello I would appreciate it if you check my code and give some feedback as i spent a while creating this project
+Hello I would appreciate it if you check my code and give some feedback! 
 
 <!--
 **Mntyys/Mntyys** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
